@@ -32,18 +32,13 @@ void setup() {
 
 void loop() {
   // Check if data is available to read from serial
-  if (Serial.available() > 0) {
+  
     // Read the incoming byte
     int motorSelection = Serial.parseInt();
 
     // Call moveServo with the received motorSelection
     moveServo(motorSelection);
 
-    // Clean the serial buffer after the operation
-    while (Serial.available() > 0) {
-      Serial.read();
-    }
-  }
 }
 
 void moveServo(int motorSelection) {
@@ -77,6 +72,6 @@ void moveServo(int motorSelection) {
       break;
     default:
       // If the motorSelection variable is not 1, 2, or 3, do nothing
-      break;
-  }
+  break;
+ }
 }
