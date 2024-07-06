@@ -25,6 +25,8 @@ def send_message_to_arduino(message):
 
 # Example usage: send a message 'Hello, Arduino!' to the Arduino
 send_message_to_arduino("1")
+send_message_to_arduino("2")
+send_message_to_arduino("3")
 
 # Close the serial connection
 ser.close()

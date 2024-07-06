@@ -2,8 +2,10 @@ import cv2
 import requests
 from dotenv import load_dotenv
 import os
-import uuid
 import time
+from gtts import gTTS
+from playsound import playsound
+import serial
 
 load_dotenv()
 
@@ -19,9 +21,20 @@ print(requests.get(BASE_URL + "/docs"))
 # ser = serial.Serial(SERIAL_PORT, 9600, timeout=1)
 
 # Function to send a number to Arduino
-# def send_number_to_arduino(number):
-#     ser.write(str(number).encode())  # Convert number to bytes and send it
-#     time.sleep(1)  # Optional delay to let Arduino process the number
+# def send_number_to_arduino(message):
+#     command = f"{message}\n"  # Append newline character to the command
+#     print(f"Sending command: {command.strip()}")
+#     ser.write(command.encode())  # Encode the command as bytes and send it
+#     time.sleep(1)  # Wait for Arduino to process the command
+
+#     while ser.in_waiting > 0:
+#         response = ser.readline().decode().strip()  # Read the response from Arduino
+#         print(f"Arduino response: {response}")
+
+def lire_texte_en_francais(texte):
+    tts = gTTS(text=texte, lang='fr')
+    tts.save("texte.mp3")
+    playsound("texte.mp3")
 
 # Load the Haar Cascades for face, eye, and mouth detection
 face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
@@ -42,6 +55,9 @@ cap = cv2.VideoCapture(0)
 if not cap.isOpened():
     print("Error: Could not open video stream or file")
     exit()
+
+# Variable to count consecutive successful face detections
+consecutive_detection_count = 0
 
 while True:
     # Capture frame-by-frame
@@ -66,15 +82,15 @@ while True:
         eyes = eye_cascade.detectMultiScale(roi_gray)
         # Detect mouth
         mouth = mouth_cascade.detectMultiScale(roi_gray, scaleFactor=1.7, minNeighbors=11, minSize=(30, 30))
-        for (mx, my, mw, mh) in mouth:
-            my = int(my - 0.15 * mh)  # Adjust mouth position to be more accurate
-
+        
         # Check if both eyes and mouth are detected
         if len(eyes) >= 2 and len(mouth) > 0:
+            consecutive_detection_count += 1
+
             # Save just the face area
             face_image = frame[y:y + h, x:x + w]
             # Path to the image file you want to upload
-            image_path = f"data/users/{str(uuid.uuid4())}.jpg"
+            image_path = f"data/users/ouail.jpg"
             cv2.imwrite(image_path, face_image)
 
             # USER RECOGNITION
@@ -93,55 +109,47 @@ while True:
                 if user_id:
                     # Print the response from the API
                     response1 = requests.get(f"{BASE_URL}/users/{user_id}")
+                    print("Salut")
                     print(response1.json())
-                    # send_number_to_arduino(1)
-                    # voice with the name of the user
+                    # If 10 consecutive detections, read the text
+                    username = response1.json()["username"]
+                    if consecutive_detection_count >= 10:
+                        texte = f"Salut {username}, je suis votre poubelle intelligente Boundif"
+                        lire_texte_en_francais(texte)
+                        # send_number_to_arduino(1)  # Send command to Arduino
+                        consecutive_detection_count = 0  # Reset count after reading text
+                    else:
+                        texte = f"Salut {username}, je suis votre poubelle intelligente Boundif"
+                        # voice with the name of the user
                 else:
                     print("No user found")
-                    # send_number_to_arduino(2)
-                    # voice with Hello, I'm Boundif
+                    # If 10 consecutive detections, read the text
+                    if consecutive_detection_count >= 10:
+                        texte = "Salut, je ne vous connais pas, je suis votre poubelle intelligente Boundif, essayez de télécharger l'application pour vous inscrire et gagner des points."
+                        lire_texte_en_francais(texte)
+                        # send_number_to_arduino(2)  # Send command to Arduino
+                        consecutive_detection_count = 0  # Reset count after reading text
+                    else:
+                        # send_number_to_arduino(2)  # Send command to Arduino
+                        texte = "Salut, je ne vous connais pas, je suis votre poubelle intelligente Boundif, essayez de télécharger l'application pour vous inscrire et gagner des points."
+                        # voice with Hello, I'm Boundif
 
             else:
                 # Print the error message if the request was not successful
                 print(f"Error: {response.status_code}")
                 print(response.text)
 
-            break
-
-    # Object detection logic
-    time.sleep(1)
-    # Path to the image file you want to upload
-    image_path = f"data/garbage/{str(uuid.uuid4())}.jpg"
-    cv2.imwrite(image_path, frame)
-
-    # Open the image file in binary mode
-    with open(image_path, "rb") as image_file:
-        # Define the files parameter to be sent in the request
-        files = {"image": image_file}
-
-        # Send a POST request to the API endpoint with the image file
-        response = requests.post(f"{BASE_URL}/ai/image-of-persone", files=files)
-        # Check if the request was successful
-        if response.status_code == 200:
-            valid_image = response.json().get("valid_image", False)
-            if not valid_image:
-                response = requests.post(f"{BASE_URL}/ai/garbage-classifier", files=files)
-                # Check if the request was successful
-                if response.status_code == 200:
-                    # paper , plastic , metal
-                    class_predicted = response.json().get("class")
-
-                    if class_predicted:
-                        # Print the response from the API
-                        if class_predicted == "plastic":
-                            print("Plastic")
-                            # send_number_to_arduino(1)
-                        elif class_predicted == "metal":
-                            print("Metal")
-                            # send_number_to_arduino(2)
-                        elif class_predicted == "paper":
-                            print("Paper")
-                            # send_number_to_arduino(3)
+        break
+    
+    if faces is None or len(faces) == 0:
+        print("No face detected")
+        # If 10 consecutive detections, read the text
+        if consecutive_detection_count >= 10:
+            texte = "Approchez vous de la poubelle pour un littoral propre"
+            lire_texte_en_francais(texte)
+        # send_number_to_arduino(3)  # Send command to Arduino
+        # voice with No face detected
+        consecutive_detection_count = 0  # Reset count when no face is detected
 
     # Display the resulting frame
     cv2.imshow('Video', frame)
